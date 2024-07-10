@@ -30,6 +30,16 @@ def create_attack(attack_name):
         raise ValueError(f"Attack {attack_name} not supported")
 
 
+def create_network_attack(attack_name, engine):
+    """
+    Function to create an attack object from its name.
+    """
+    if attack_name == "GeoAttack":
+        return GeoAttack(engine, attack_type="targeted")
+    else:
+        raise ValueError(f"Attack {attack_name} not supported")
+
+
 class Attack:
 
     def __call__(self, *args: Any, **kwds: Any) -> Any:
@@ -39,6 +49,12 @@ class Attack:
         """
         Function to perform the attack on the received weights. It should return the
         attacked weights.
+        """
+        raise NotImplementedError
+
+    def attack_network(self):
+        """
+        Function to perform the attack on the network. It should return the attacked network.
         """
         raise NotImplementedError
 
@@ -146,3 +162,37 @@ class DelayerAttack(Attack):
         if self.weights is None:
             self.weights = deepcopy(received_weights)
         return self.weights
+
+
+class GeoAttack(Attack):
+    """
+    Function to perform geo attack on the latitudes and longitudes of the nodes.
+    Two types of attacks are supported:
+    - Random attack: the attacker changes the latitude and longitude of the node (move it far away).
+    - Targeted attack: the attacker moves the node to the location of another node.
+    """
+
+    def __init__(self, engine, attack_type="random"):
+        super().__init__()
+        self.engine = engine
+        self.attack_type = attack_type
+        self.attacker_node = None
+        self.target_node = None
+
+    def attack_network(self):
+        try:
+            logging.info("[GeoAttack] Performing geopositioning attack")
+            current_latitude = float(self.engine.config.participant["mobility_args"]["latitude"])
+            current_longitude = float(self.engine.config.participant["mobility_args"]["longitude"])
+            if self.attack_type == "random":
+                self.engine.config.participant["mobility_args"]["latitude"] = current_latitude + np.random.uniform(-0.1, 0.1)
+                self.engine.config.participant["mobility_args"]["longitude"] = current_longitude + np.random.uniform(-0.1, 0.1)
+            elif self.attack_type == "targeted":
+                selected_neighbor = self.engine.cm.get_nearest_connections(top=1)
+                neighbor_latitude, neighbor_longitude = selected_neighbor.get_geolocation()
+                self.engine.config.participant["mobility_args"]["latitude"] = neighbor_latitude + np.random.uniform(-0.1, 0.1)
+                self.engine.config.participant["mobility_args"]["longitude"] = neighbor_longitude + np.random.uniform(-0.1, 0.1)
+            else:
+                raise ValueError(f"[GeoAttack] Attack type {self.attack_type} not supported")
+        except Exception:
+            pass

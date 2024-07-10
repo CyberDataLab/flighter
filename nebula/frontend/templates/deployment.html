@@ -524,6 +524,7 @@
                             <option>NoiseInjectionAttack</option>
                             <option>SwappingWeightsAttack</option>
                             <option>DelayerAttack</option>
+                            <option>GeoAttack</option>
                         </select>
                     </div>
                     <h5 class="step-title">% malicious nodes</h5>
@@ -552,30 +553,28 @@
                             <i class="fa fa-lock"></i> 
                         </label>
                     </h5>
-                    <h5 class="step-title">Reputation System</h5>
+                    <h5 class="step-title">Defense Module</h5>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="reputationSystem" id="without-reputation-btn"
                             checked>
                         <label class="form-check-label" for="without-reputation-btn">Disable
-                            Reputation</label>
+                            Defense</label>
                     </div>
                     <div class="form-check form-check-inline">
                         <input class="form-check-input" type="radio" name="reputationSystem" id="with-reputation-btn">
-                        <label class="form-check-label" for="with-reputation-btn">Enable Reputation</label>
+                        <label class="form-check-label" for="with-reputation-btn">Enable Defense</label>
                     </div>
                     <div id="mtd-strategy" style="display: none; margin-left: 10px">
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="checkbox" name="dynamicTopology"
                                 id="dynamic-topology-btn">
-                            <label class="form-check-label" for="dynamic-topology-btn">Dynamic
-                                Topology</label>
+                            <label class="form-check-label" for="dynamic-topology-btn">Dynamic Connections</label>
 
                         </div>
                         <div class="form-check form-check-inline">
                             <input class="form-check-input" type="checkbox" name="dynamicAggregation"
                                 id="dynamic-aggregation-btn">
-                            <label class="form-check-label" for="dynamic-aggregation-btn">Dynamic
-                                Aggregation</label>
+                            <label class="form-check-label" for="dynamic-aggregation-btn">Dynamic Aggregation</label>
                         </div>
                         <div id="target-aggregation" style="display: none; margin-left: 20px">
                             <h5 class="step-title">Target Aggregation Algorithm</h5>
@@ -654,8 +653,11 @@
                         <h5 class="step-title">Scheme of mobility</h5>
                         <div class="form-check form-check-inline">
                             <select class="form-control" id="schemeMobilitySelect" name="schemeMobility"
-                                style="display: inline" disabled>
+                                style="display: inline">
                                 <option value="random" selected>Random</option>
+                                <option value="vic">VIC formation</option>
+                                <option value="diamond">Diamond formation</option>
+                                <option value="line">Right Hand Line formation</option>
                             </select>
                         </div>
                         <h5 class="step-title">Each participant moves every (rounds)</h5>

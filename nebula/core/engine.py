@@ -4,7 +4,7 @@ import os
 
 import docker
 from nebula.addons.functions import print_msg_box
-from nebula.addons.attacks.attacks import create_attack
+from nebula.addons.attacks.attacks import create_attack, create_network_attack
 from nebula.addons.reporter import Reporter
 from nebula.core.aggregation.aggregator import create_aggregator, create_malicious_aggregator, create_target_aggregator
 from nebula.core.eventmanager import EventManager, event_handler
@@ -511,7 +511,8 @@ class MaliciousNode(Engine):
 
     def __init__(self, model, dataset, config=Config, trainer=Lightning, security=False, model_poisoning=False, poisoned_ratio=0, noise_type="gaussian"):
         super().__init__(model, dataset, config, trainer, security, model_poisoning, poisoned_ratio, noise_type)
-        self.attack = create_attack(config.participant["adversarial_args"]["attacks"])
+        self.attack = create_attack(config.participant["adversarial_args"]["attacks"], engine=self)
+        self.attack_network = create_network_attack(config.participant["adversarial_args"]["attacks"], engine=self)
         self.fit_time = 0.0
         self.extra_time = 0.0
 
@@ -521,8 +522,11 @@ class MaliciousNode(Engine):
         self.aggregator_bening = self._aggregator
 
     async def _extended_learning_cycle(self):
+        # Generate the network (geopositioning) attack
+        self.attack_network()
         if self.round in range(self.round_start_attack, self.round_stop_attack):
             logging.info(f"Changing aggregation function maliciously...")
+            # Generate the adversarial data attack
             self._aggregator = create_malicious_aggregator(self._aggregator, self.attack)
         elif self.round == self.round_stop_attack:
             logging.info(f"Changing aggregation function benignly...")

@@ -176,6 +176,58 @@ class Mobility(threading.Thread):
                 self.cm.connect(random_potential_neighbor, direct=True)
                 logging.info(f"📍  New connections: {self.get_current_connections(only_direct=True)}")
                 logging.info(f"📍  Neighbors in config: {self.config.participant['network_args']['neighbors']}")
+            elif self.scheme_mobility == "vic":
+                # Change connections based on VIC flight formation: formation devised for military aircraft and first used during the First World War. It has three or sometimes more aircraft fly in close formation with the leader at the apex and the rest of the flight en echelon to the left and the right, the whole resembling the letter "V".
+                # Change my latitude and longitude to the center of the formation, and connect to the nearest neighbors
+                # Get the neighbors closer to me
+                selected_neighbor = self.cm.get_nearest_connections(top=1)
+                logging.info(f"📍  Selected neighbor: {selected_neighbor}" f" | Distance: {selected_neighbor.get_neighbor_distance()}")
+                neighbor_latitude, neighbor_longitude = selected_neighbor.get_geolocation()
+                # Calculate the center of the formation
+                formation_latitude = (float(self.config.participant["mobility_args"]["latitude"]) + neighbor_latitude) / 2
+                formation_longitude = (float(self.config.participant["mobility_args"]["longitude"]) + neighbor_longitude) / 2
+                self.set_geo_location(formation_latitude, formation_longitude)
+                # Connect to the nearest neighbors
+                self.cm.connect(selected_neighbor.get_addr(), direct=True)
+                logging.info(f"📍  New connections: {self.cm.get_addrs_current_connections(only_direct=True)}" f" | Neighbors in config: {self.config.participant['network_args']['neighbors']}")
+            elif self.scheme_mobility == "diamond":
+                # Change connections based on diamond formation
+                # Change my latitude and longitude to a new location, and connect to the nearest neighbors
+                # Update the locations based on the diamond formation (predefined locations)
+                diamond_locations = [
+                    {"latitude": self.config.participant["mobility_args"]["latitude"], "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] + 0.1, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] - 0.1, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"], "longitude": self.config.participant["mobility_args"]["longitude"] + 0.1},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"], "longitude": self.config.participant["mobility_args"]["longitude"] - 0.1},
+                ]
+
+                logging.info(f"📍  Changing geo location to a new location based on diamond formation" f" | New location: {diamond_locations[self.round % len(diamond_locations)]}")
+                self.set_geo_location(diamond_locations[self.round % len(diamond_locations)]["latitude"], diamond_locations[self.round % len(diamond_locations)]["longitude"])
+                # Connect to the nearest neighbors
+                selected_neighbor = self.cm.get_nearest_connections(top=1)
+                logging.info(f"📍  Selected neighbor: {selected_neighbor}" f" | Distance: {selected_neighbor.get_neighbor_distance()}")
+                self.cm.connect(selected_neighbor.get_addr(), direct=True)
+                logging.info(f"📍  New connections: {self.cm.get_addrs_current_connections(only_direct=True)}" f" | Neighbors in config: {self.config.participant['network_args']['neighbors']}")
+            elif self.scheme_mobility == "line":
+                # Change connections based on line formation
+                # Change my latitude and longitude to a new location, and connect to the nearest neighbors
+                # Update the locations based on the line formation (predefined locations)
+                line_locations = [
+                    {"latitude": self.config.participant["mobility_args"]["latitude"], "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] + 0.1, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] + 0.2, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] + 0.3, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                    {"latitude": self.config.participant["mobility_args"]["latitude"] + 0.4, "longitude": self.config.participant["mobility_args"]["longitude"]},
+                ]
+
+                logging.info(f"📍  Changing geo location to a new location based on line formation" f" | New location: {line_locations[self.round % len(line_locations)]}")
+                self.set_geo_location(line_locations[self.round % len(line_locations)]["latitude"], line_locations[self.round % len(line_locations)]["longitude"])
+                # Connect to the nearest neighbors
+                selected_neighbor = self.cm.get_nearest_connections(top=1)
+                logging.info(f"📍  Selected neighbor: {selected_neighbor}" f" | Distance: {selected_neighbor.get_neighbor_distance()}")
+                self.cm.connect(selected_neighbor.get_addr(), direct=True)
+                logging.info(f"📍  New connections: {self.cm.get_addrs_current_connections(only_direct=True)}" f" | Neighbors in config: {self.config.participant['network_args']['neighbors']}")
             else:
                 logging.error(f"📍  Mobility scheme {self.scheme_mobility} not implemented")
                 return

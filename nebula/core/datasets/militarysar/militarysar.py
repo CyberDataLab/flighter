@@ -61,6 +61,11 @@ class CenterCrop(object):
 
 
 class MilitarySAR(Dataset):
+    """
+    MilitarySAR dataset class.
+    Dataset: https://www.sdms.afrl.af.mil/index.php?collection=mstar
+    It is necessary to download the dataset and place it in the "data" folder in the same directory as this file.
+    """
 
     def __init__(self, name="soc", is_train=False, transform=None):
         self.is_train = is_train
