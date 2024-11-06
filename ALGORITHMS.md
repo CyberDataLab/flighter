@@ -19,7 +19,7 @@ The module continuously monitors the similarity of model updates, comparing them
 One of the methods used to measure the similarity between model updates is cosine similarity. The cosine similarity between two model update vectors $\mathbf{u}$ and $\mathbf{v}$ is defined as:
 
 $$
-\text{cosine\_similarity}(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\| \|\mathbf{v}\|}
+\mathrm{cosine\_sim}(\mathbf{u}, \mathbf{v}) = \frac{\mathbf{u} \cdot \mathbf{v}}{\|\mathbf{u}\| \|\mathbf{v}\|}
 $$
 
 where:
