@@ -12,6 +12,7 @@ from torchmetrics.classification import (
 from torchmetrics import MetricCollection
 import seaborn as sns
 import matplotlib.pyplot as plt
+from torch import autograd
 
 
 class NebulaModel(pl.LightningModule, ABC):
@@ -124,6 +125,7 @@ class NebulaModel(pl.LightningModule, ABC):
         metrics=None,
         confusion_matrix=None,
         seed=None,
+        fisher_threshold=0.4
     ):
         super().__init__()
 
@@ -153,6 +155,7 @@ class NebulaModel(pl.LightningModule, ABC):
             torch.cuda.manual_seed_all(seed)
 
         self.global_number = {"Train": 0, "Validation": 0, "Test (Local)": 0, "Test (Global)": 0}
+        self.fisher_threshold = fisher_threshold
 
     @abstractmethod
     def forward(self, x):
@@ -188,6 +191,56 @@ class NebulaModel(pl.LightningModule, ABC):
         self.log_metrics_end("Train")
         self.train_metrics.reset()
         self.global_number["Train"] += 1
+        
+        fisher_diag = self.compute_fisher_diag(self, self.train_dataloader)
+        
+        for param in self.parameters():
+            u_param = (param * (fisher_diag > self.fisher_threshold)).clone().detach()
+            param.data = u_param
+    
+        import torch
+    from torch import autograd
+    
+    def compute_fisher_information(model, dataloader):
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.eval()
+        
+        # Initialize Fisher Information matrix with zeros
+        fisher_information = [torch.zeros_like(param) for param in model.parameters()]
+    
+        for data, labels in dataloader:
+            data, labels = data.to(device), labels.to(device)
+    
+            # Calculate output log probabilities
+            log_probs = torch.nn.functional.log_softmax(model(data), dim=1)
+    
+            for i, label in enumerate(labels):
+                log_prob = log_probs[i, label]
+    
+                # Calculate first-order derivatives (gradients)
+                model.zero_grad()
+                gradients = autograd.grad(log_prob, model.parameters(), create_graph=True, retain_graph=True)
+    
+                # Update Fisher Information matrix
+                for fisher_value, grad in zip(fisher_information, gradients):
+                    fisher_value.add_(grad.detach() ** 2)
+                    
+                # Free up memory by removing computation graph
+                del log_prob, gradients
+    
+        # Calculate the mean value
+        num_samples = len(dataloader.dataset)
+        fisher_information = [fisher_value / num_samples for fisher_value in fisher_information]
+    
+        # Normalize Fisher values layer-wise
+        normalized_fisher_information = []
+        for fisher_value in fisher_information:
+            x_min = torch.min(fisher_value)
+            x_max = torch.max(fisher_value)
+            normalized_fisher_value = (fisher_value - x_min) / (x_max - x_min)
+            normalized_fisher_information.append(normalized_fisher_value)
+    
+        return normalized_fisher_information
 
     def on_train_epoch_end(self):
         pass

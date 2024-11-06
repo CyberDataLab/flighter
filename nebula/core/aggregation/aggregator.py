@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from functools import partial
 import logging
+
+import torch
 from nebula.core.utils.locker import Locker
 from nebula.core.pb import nebula_pb2
 
@@ -146,6 +148,12 @@ class Aggregator(ABC):
             self._handle_global_update(model, source)
             return
 
+        # Evaluate model reliability before including it in the buffer
+        if not self.engine.evaluate_model_reliability():
+            logging.info(f"Model from {source} classified as malicious and will not be included in the buffer.")
+            self._add_model_lock.release()
+            return
+
         self._add_pending_model(model, weight, source)
         
         if len(self.get_nodes_pending_models_to_aggregate()) >= len(self._federation_nodes):
@@ -175,6 +183,26 @@ class Aggregator(ABC):
             logging.info(f"🔄  get_aggregation | Aggregation incomplete, missing models from: {missing_nodes}")
         else:
             logging.info(f"🔄  get_aggregation | All models accounted for, proceeding with aggregation.")
+        
+        # Adapted from Dynamic Personalized Federated Learning with Adaptive Differential Privacy implementation. NeurIPS 2023
+        dp = self.config.participant["defense_args"]["dp"]
+        clip = self.config.participant["defense_args"]["model_clip"]
+        
+        if dp:
+            for node, (model, weight) in self._pending_models_to_aggregate.items():
+                if clip:
+                    norm = torch.sqrt(sum([torch.sum(torch.square(param)) for param in model.values()]))
+                    clip_rate = max(1, (norm / self.config.participant["defense_args"]["clipping_bound"]))
+                    for param in model.values():
+                        param.data /= clip_rate
+            
+            for node, (model, weight) in self._pending_models_to_aggregate.items():
+                noise_stddev = torch.sqrt(torch.tensor((self.config.participant["defense_args"]["clipping_bound"] ** 2) * 2 * self.config.participant["defense_args"]["dp_epsilon"] / weight))
+                noise = torch.normal(mean=0, std=noise_stddev)
+                for param in model.values():
+                    param.data += noise
+        else:
+            logging.info(f"🔄  get_aggregation | No DP applied.")
 
         return self.run_aggregation(self._pending_models_to_aggregate)
 

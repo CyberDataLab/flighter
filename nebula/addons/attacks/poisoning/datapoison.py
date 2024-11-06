@@ -55,12 +55,18 @@ def datapoison(dataset, indices, poisoned_persent, poisoned_ratio, targeted=Fals
 
 def add_x_to_image(img):
     """
-    Add a 10*10 pixels X at the top-left of an image
+    Add a 10x10 pixels X at the top-left of an image.
     """
-    for i in range(0, 10):
-        for j in range(0, 10):
-            if i + j <= 9 or i == j:
-                img[i][j] = 255
+    # Ensure img is a NumPy array
+    if not isinstance(img, np.ndarray):
+        raise TypeError("Input image must be a NumPy array")
+
+    # Add the X pattern
+    for i in range(10):
+        img[i, i] = 255  # Main diagonal
+        img[i, 9 - i] = 255  # Anti-diagonal
+
+    # Convert to PyTorch tensor before returning
     return torch.tensor(img)
 
 

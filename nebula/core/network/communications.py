@@ -106,6 +106,24 @@ class CommunicationsManager:
     def mobility(self):
         return self._mobility
 
+    def calculate_average_latency(self):
+        total_latency = 0
+        count = 0
+        for conn in self.connections.values():
+            if conn.latitude is not None and conn.longitude is not None:
+                latency = conn.calculate_latency(conn.latitude, conn.longitude)
+                total_latency += latency
+                count += 1
+        return total_latency / count if count > 0 else 0
+
+    def adjust_weights_based_on_latency(self):
+        average_latency = self.calculate_average_latency()
+        base_decay_rate = self.config.network["base_decay_rate"]
+        proportionality_constant = self.config.network["proportionality_constant"]
+        adjusted_decay_rate = base_decay_rate + proportionality_constant * average_latency
+        logging.info(f"Adjusted decay rate: {adjusted_decay_rate}")
+        return adjusted_decay_rate
+
     async def handle_incoming_message(self, data, addr_from):
         try:
             message_wrapper = nebula_pb2.Wrapper()
@@ -125,9 +143,8 @@ class CommunicationsManager:
                     await self.handle_federation_message(source, message_wrapper.federation_message)
             elif message_wrapper.HasField("model_message"):
                 if self.include_received_message_hash(hashlib.md5(data).hexdigest()):
-                    # TODO: Improve the technique. Now only forward model messages if the node is a proxy
-                    # Need to update the expected model messages receiving during the round
-                    # Round -1 is the initialization round --> all nodes should receive the model
+                    adjusted_decay_rate = self.adjust_weights_based_on_latency()
+                    logging.info(f"Adjusted decay rate for model message: {adjusted_decay_rate}")
                     if self.config.participant["device_args"]["proxy"] or message_wrapper.model_message.round == -1:
                         self.forwarder.forward(data, addr_from=addr_from)
                     await self.handle_model_message(source, message_wrapper.model_message)

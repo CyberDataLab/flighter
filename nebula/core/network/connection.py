@@ -227,12 +227,26 @@ class Connection:
             logging.error(f"❗️  Error retrieving message: {e}")
             return None
 
+    def calculate_latency(self, other_latitude, other_longitude):
+        distance_m = self.compute_distance(other_latitude, other_longitude)
+        propagation_speed = self.config.network["propagation_speed"]
+        processing_delay = self.config.network["processing_delay"]
+        queuing_delay = self.config.network["queuing_delay"]
+        latency = distance_m / propagation_speed + processing_delay + queuing_delay
+        return latency
+
+    def calculate_reliability(self, latency):
+        decay_constant = self.config.network["decay_constant"]
+        link_stability_probability = self.config.network["link_stability_probability"]
+        reliability = (2.718 ** (-decay_constant * latency)) * link_stability_probability
+        return reliability
+
     async def handle_incoming_message(self):
         try:
             buffer = b""
             while True:
                 try:
-                    chunk = await self.reader.read(4096)
+                    chunk = await self.reader.read(self.config.network["read_chunk_size"])
                     if not chunk:
                         break
                     buffer += chunk
@@ -242,16 +256,19 @@ class Connection:
                         buffer = buffer[eot_pos + len(self.EOT_CHAR) :]
                         await self.retrieve_message(message)
                         eot_pos = buffer.find(self.EOT_CHAR)
+                        latency = self.calculate_latency(self.latitude, self.longitude)
+                        reliability = self.calculate_reliability(latency)
+                        logging.info(f"Latency: {latency}, Reliability: {reliability}")
                 except asyncio.IncompleteReadError:
-                    logging.error(f"❗️  Incomplete read error")
+                    logging.error(f"Incomplete read error")
                     break
                 except Exception as e:
-                    logging.error(f"❗️  Error handling connection: {e}")
+                    logging.error(f"Error handling connection: {e}")
                     break
         except asyncio.CancelledError:
-            logging.error(f"❗️  {self} cancelled...")
+            logging.error(f"{self} cancelled...")
         except Exception as e:
-            logging.error(f"❗️  Error handling connection: {e}")
+            logging.error(f"Error handling connection: {e}")
         finally:
-            logging.error(f"❗️  {self} stopped...")
+            logging.error(f"{self} stopped...")
             await self.stop()

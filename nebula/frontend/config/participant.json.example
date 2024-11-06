@@ -89,6 +89,12 @@
     "aggregation_timeout": 300
   },
   "defense_args": {
+    "dp": true,
+    "dp_epsilon": 4.0,
+    "model_clip": true,
+    "clipping_bound": 0.5,
+    "fisher_value": 0.1,
+    "fisher_threshold": 0.1,
     "with_reputation": false,
     "is_dynamic_topology": false,
     "is_dynamic_aggregation": false,

@@ -56,7 +56,7 @@ def print_banner():
                     ██╔██╗ ██║█████╗  ██████╔╝██║   ██║██║     ███████║
                     ██║╚██╗██║██╔══╝  ██╔══██╗██║   ██║██║     ██╔══██║
                     ██║ ╚████║███████╗██████╔╝╚██████╔╝███████╗██║  ██║
-                    ╚═╝  ╚═══╝╚══════╝╚═════╝  ╚═════╝ ╚══════╝╚═╝  ╚═╝                 
+                    ╚═╝  ╚═══╝╚══════╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝                 
                       A Platform for Decentralized Federated Learning
                         Created by Enrique Tomás Martínez Beltrán
                         https://github.com/enriquetomasmb/nebula
@@ -420,6 +420,45 @@ class Engine:
         else:
             logging.error(f"Aggregation finished with no parameters")
 
+    def calculate_defense_score(self, metrics, weights, regularization_term):
+        score = 0
+        for t in range(len(metrics)):
+            score += weights[t] * (metrics[t] - regularization_term[t])
+        return score
+
+    def calculate_regularization_term(self, metrics, expected_values, variances):
+        regularization_term = []
+        for k in range(len(metrics)):
+            term = variances[k] * (metrics[k] - expected_values[k]) ** 2
+            regularization_term.append(term)
+        return regularization_term
+
+    def calculate_dynamic_threshold(self, t, T):
+        k = self.config.defense["threshold_constant"]
+        threshold = self.config.defense["threshold_base"] / (1 + 2.718 ** (-k * (t - self.config.defense["threshold_offset"] * T)))
+        return threshold
+
+    def evaluate_model_reliability(self):
+        metrics = [self.trainer.get_metric(k) for k in range(self.config.defense["num_metrics"])]
+        expected_values = [self.trainer.get_expected_value(k) for k in range(self.config.defense["num_metrics"])]
+        variances = [self.trainer.get_variance(k) for k in range(self.config.defense["num_metrics"])]
+        weights = self.config.defense["weights"]
+
+        regularization_term = self.calculate_regularization_term(metrics, expected_values, variances)
+        defense_score = self.calculate_defense_score(metrics, weights, regularization_term)
+        dynamic_threshold = self.calculate_dynamic_threshold(self.get_round(), self.total_rounds)
+
+        logging.info(f"Defense Score: {defense_score}, Dynamic Threshold: {dynamic_threshold}")
+        return defense_score >= dynamic_threshold
+
+    async def _extended_learning_cycle(self):
+        # ...existing code...
+        if self.evaluate_model_reliability():
+            logging.info("Node classified as benign")
+        else:
+            logging.info("Node classified as malicious")
+        pass
+
     async def _learning_cycle(self):
         while self.round is not None and self.round < self.total_rounds:
             print_msg_box(msg=f"Round {self.round} of {self.total_rounds} started.", indent=2, title="Round information")
@@ -459,57 +498,6 @@ class Engine:
             print(f"Docker container with ID {self.docker_id} stopped successfully.")
         except Exception as e:
             print(f"Error stopping Docker container with ID {self.docker_id}: {e}")
-
-    async def _extended_learning_cycle(self):
-        """
-        This method is called in each round of the learning cycle. It is used to extend the learning cycle with additional
-        functionalities. The method is called in the _learning_cycle method.
-        """
-        pass
-
-    def reputation_calculation(self, aggregated_models_weights):
-        cossim_threshold = 0.5
-        loss_threshold = 0.5
-
-        current_models = {}
-        for subnodes in aggregated_models_weights.keys():
-            sublist = subnodes.split()
-            submodel = aggregated_models_weights[subnodes][0]
-            for node in sublist:
-                current_models[node] = submodel
-
-        malicious_nodes = []
-        reputation_score = {}
-        local_model = self.trainer.get_model_parameters()
-        untrusted_nodes = list(current_models.keys())
-        logging.info(f"reputation_calculation untrusted_nodes at round {self.round}: {untrusted_nodes}")
-
-        for untrusted_node in untrusted_nodes:
-            logging.info(f"reputation_calculation untrusted_node at round {self.round}: {untrusted_node}")
-            logging.info(f"reputation_calculation self.get_name() at round {self.round}: {self.get_name()}")
-            if untrusted_node != self.get_name():
-                untrusted_model = current_models[untrusted_node]
-                cossim = cosine_metric(local_model, untrusted_model, similarity=True)
-                logging.info(f"reputation_calculation cossim at round {self.round}: {untrusted_node}: {cossim}")
-                self.trainer._logger.log_data({f"Reputation/cossim_{untrusted_node}": cossim}, step=self.round)
-
-                avg_loss = self.trainer.validate_neighbour_model(untrusted_model)
-                logging.info(f"reputation_calculation avg_loss at round {self.round} {untrusted_node}: {avg_loss}")
-                self.trainer._logger.log_data({f"Reputation/avg_loss_{untrusted_node}": avg_loss}, step=self.round)
-                reputation_score[untrusted_node] = (cossim, avg_loss)
-
-                if cossim < cossim_threshold or avg_loss > loss_threshold:
-                    malicious_nodes.append(untrusted_node)
-                else:
-                    self._secure_neighbors.append(untrusted_node)
-
-        return malicious_nodes, reputation_score
-
-    async def send_reputation(self, malicious_nodes):
-        logging.info(f"Sending REPUTATION to the rest of the topology: {malicious_nodes}")
-        message = self.cm.mm.generate_federation_message(nebula_pb2.FederationMessage.Action.REPUTATION, malicious_nodes)
-        await self.cm.send_message_to_neighbors(message)
-
 
 class MaliciousNode(Engine):
 
